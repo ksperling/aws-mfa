@@ -41,13 +41,17 @@ class AwsMfa
     return nil
   end
 
-  def load_arn
-    arn_file = File.join(aws_config_dir, 'mfa_device')
+  def load_arn(profile='default')
+    arn_file_name = 'mfa_device'
+    if (! profile.eql? 'default')
+      arn_file_name = "#{profile}_#{arn_file_name}"
+    end
+    arn_file = File.join(aws_config_dir, arn_file_name)
 
     if File.readable?(arn_file)
       arn = load_arn_from_file(arn_file)
     else
-      arn = load_arn_from_aws
+      arn = load_arn_from_aws(profile)
       write_arn_to_file(arn_file, arn)
     end
 
@@ -58,17 +62,17 @@ class AwsMfa
     File.read(arn_file)
   end
 
-  def load_arn_from_aws
+  def load_arn_from_aws(profile='default')
     puts 'Fetching MFA devices for your account...'
-    if mfa_devices.any?
-      mfa_devices.first.fetch('SerialNumber')
+    if mfa_devices(profile).any?
+      mfa_devices(profile).first.fetch('SerialNumber')
     else
       raise Errors::DeviceNotFound, 'No MFA devices were found for your account'
     end
   end
 
-  def mfa_devices
-    @mfa_devices ||= JSON.parse(`aws --output json iam list-mfa-devices`).fetch('MFADevices')
+  def mfa_devices(profile='default')
+    @mfa_devices ||= JSON.parse(`aws --profile #{profile} --output json iam list-mfa-devices`).fetch('MFADevices')
   end
 
   def write_arn_to_file(arn_file, arn)
@@ -76,13 +80,17 @@ class AwsMfa
     puts "Using MFA device #{arn}. To change this in the future edit #{arn_file}."
   end
 
-  def load_credentials(arn)
-    credentials_file  = File.join(aws_config_dir, 'mfa_credentials')
+  def load_credentials(arn, profile='default')
+    credentials_file_name = 'mfa_credentials'
+    if (! profile.eql? 'default')
+      credentials_file_name = "#{profile}_#{credentials_file_name}"
+    end
+    credentials_file  = File.join(aws_config_dir, credentials_file_name)
 
     if File.readable?(credentials_file) && token_not_expired?(credentials_file)
       credentials = load_credentials_from_file(credentials_file)
     else
-      credentials = load_credentials_from_aws(arn)
+      credentials = load_credentials_from_aws(arn, profile)
       write_credentials_to_file(credentials_file, credentials)
     end
 
@@ -93,10 +101,10 @@ class AwsMfa
     File.read(credentials_file)
   end
 
-  def load_credentials_from_aws(arn)
+  def load_credentials_from_aws(arn, profile='default')
     code = request_code_from_user
     unset_environment
-    `aws --output json sts get-session-token --serial-number #{arn} --token-code #{code}`
+    `aws --profile #{profile} --output json sts get-session-token --serial-number #{arn} --token-code #{code}`
   end
 
   def write_credentials_to_file(credentials_file, credentials)
@@ -144,8 +152,14 @@ class AwsMfa
   end
 
   def execute
-    arn = load_arn
-    credentials = load_credentials(arn)
+    profile = 'default'
+    profile_index = ARGV.index('--profile')
+    if (!profile_index.nil?)
+      profile = ARGV.delete_at(profile_index + 1)
+      ARGV.delete_at(profile_index)
+    end
+    arn = load_arn(profile)
+    credentials = load_credentials(arn, profile)
     if ARGV.empty?
       print_credentials(credentials)
     else

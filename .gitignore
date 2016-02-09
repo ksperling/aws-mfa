@@ -1,1 +1,4 @@
 coverage/
+.idea
+*.gem
+.DS_Store

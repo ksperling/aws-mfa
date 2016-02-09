@@ -64,6 +64,27 @@ RSpec.describe 'AwsMfa' do
     end
   end
 
+  describe '#load_arn_profile' do
+    before(:each) do
+      create_aws_binary
+      create_aws_config
+    end
+
+    let(:device_path) { '/home/.aws/prod_mfa_device' }
+
+    it 'loads arn from file when it exists for profile' do
+      subject.write_arn_to_file(device_path, 'bar')
+      expect(subject.load_arn('prod')).to eq 'bar'
+    end
+
+    it 'loads arn from aws when file does not exist for profile' do
+      allow(subject).to receive(:mfa_devices).and_return([{
+                                                              'SerialNumber' => 'foo'
+                                                          }])
+      expect(subject.load_arn('prod')).to eq 'foo'
+    end
+  end
+
   describe '#load_credentials' do
     before(:each) do
       create_aws_binary
@@ -88,6 +109,33 @@ RSpec.describe 'AwsMfa' do
     it 'loads credentials from aws when file does not exist' do
       allow(subject).to receive(:load_credentials_from_aws).and_return('{"Credentials":"foo"}')
       expect(subject.load_credentials('arn')).to eq 'foo'
+    end
+  end
+
+  describe '#load_credentials_profile' do
+    before(:each) do
+      create_aws_binary
+      create_aws_config
+    end
+
+    let(:credentials_path) { '/home/.aws/prod_mfa_credentials' }
+
+    it 'loads credentials from file when it is fresh for profile' do
+      subject.write_arn_to_file(credentials_path, '{"Credentials":"bar"}')
+      expect(subject.load_credentials('arn', 'prod')).to eq 'bar'
+    end
+
+    it 'loads credentials from aws when file is too old for profile' do
+      threshold = 60 * 60 * 12
+      subject.write_arn_to_file(credentials_path, '{"Credentials":"bar"}')
+      File.utime(Time.now, Time.now - threshold, credentials_path)
+      allow(subject).to receive(:load_credentials_from_aws).and_return('{"Credentials":"foo"}')
+      expect(subject.load_credentials('arn', 'prod')).to eq 'foo'
+    end
+
+    it 'loads credentials from aws when file does not exist' do
+      allow(subject).to receive(:load_credentials_from_aws).and_return('{"Credentials":"foo"}')
+      expect(subject.load_credentials('arn', 'prod')).to eq 'foo'
     end
   end
 

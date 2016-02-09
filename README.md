@@ -23,6 +23,8 @@ Before using `aws-mfa`, you must have the [AWS CLI](https://aws.amazon.com/cli/)
 
 The very first time you run `aws-mfa` it will fetch the ARN for your MFA device and ask you to confirm it. Next, it will prompt you for the 6-digit code from your MFA device. For the next 12 hours, `aws-mfa` will not prompt you for anything. After 12 hours, your temporary credentials expire, so `aws-mfa` will prompt you for the 6-digit code again.
 
+By default `aws-mfa` will use the default profile from aws cli, to specify a different profile to use simply use the `--profile` parameter like you normally would with the aws cli
+
 There are two ways you can use `aws-mfa`:
 
 ### Eval
