@@ -106,7 +106,13 @@ class AwsMfa
   def load_credentials_from_aws(arn, profile='default')
     code = request_code_from_user
     unset_environment
-    `aws --profile #{profile} --output json sts get-session-token --serial-number #{arn} --token-code #{code}`
+    credentials_command = "aws --profile #{profile} --output json sts get-session-token --serial-number #{arn} --token-code #{code}"
+    result = AwsMfa::ShellCommand.new(credentials_command).call
+    if result.succeeded?
+      result.output
+    else
+      raise Errors::InvalidCode, 'There was a problem validating the MFA code with AWS'
+    end
   end
 
   def write_credentials_to_file(credentials_file, credentials)
