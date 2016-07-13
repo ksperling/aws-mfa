@@ -1,5 +1,7 @@
 require 'json'
 require 'aws_mfa/errors'
+require 'aws_mfa/shell_command'
+require 'aws_mfa/shell_command_result'
 
 class AwsMfa
   attr_reader :aws_config_dir
