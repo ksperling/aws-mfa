@@ -74,7 +74,15 @@ class AwsMfa
   end
 
   def mfa_devices(profile='default')
-    @mfa_devices ||= JSON.parse(`aws --profile #{profile} --output json iam list-mfa-devices`).fetch('MFADevices')
+    @mfa_devices ||= begin
+      list_mfa_devices_command = "aws --profile #{profile} --output json iam list-mfa-devices"
+      result = AwsMfa::ShellCommand.new(list_mfa_devices_command).call
+      if result.succeeded?
+        JSON.parse(result.output).fetch('MFADevices')
+      else
+        raise Errors::Error, 'There was a problem fetching MFA devices from AWS'
+      end
+    end
   end
 
   def write_arn_to_file(arn_file, arn)

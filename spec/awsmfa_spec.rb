@@ -62,6 +62,16 @@ RSpec.describe 'AwsMfa' do
       }])
       expect(subject.load_arn).to eq 'foo'
     end
+
+    it 'raises an error when there is a problem with aws' do
+      command = double(call: double(succeeded?: false))
+      allow(AwsMfa::ShellCommand).to receive(:new).and_return(command)
+
+      expect { subject.load_arn }.to raise_error(
+        AwsMfa::Errors::Error,
+        'There was a problem fetching MFA devices from AWS'
+      )
+    end
   end
 
   describe '#load_arn_profile' do
