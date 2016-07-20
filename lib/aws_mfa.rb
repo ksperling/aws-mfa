@@ -1,5 +1,7 @@
 require 'json'
 require 'aws_mfa/errors'
+require 'aws_mfa/shell_command'
+require 'aws_mfa/shell_command_result'
 
 class AwsMfa
   attr_reader :aws_config_dir
@@ -72,7 +74,15 @@ class AwsMfa
   end
 
   def mfa_devices(profile='default')
-    @mfa_devices ||= JSON.parse(`aws --profile #{profile} --output json iam list-mfa-devices`).fetch('MFADevices')
+    @mfa_devices ||= begin
+      list_mfa_devices_command = "aws --profile #{profile} --output json iam list-mfa-devices"
+      result = AwsMfa::ShellCommand.new(list_mfa_devices_command).call
+      if result.succeeded?
+        JSON.parse(result.output).fetch('MFADevices')
+      else
+        raise Errors::Error, 'There was a problem fetching MFA devices from AWS'
+      end
+    end
   end
 
   def write_arn_to_file(arn_file, arn)
@@ -104,7 +114,13 @@ class AwsMfa
   def load_credentials_from_aws(arn, profile='default')
     code = request_code_from_user
     unset_environment
-    `aws --profile #{profile} --output json sts get-session-token --serial-number #{arn} --token-code #{code}`
+    credentials_command = "aws --profile #{profile} --output json sts get-session-token --serial-number #{arn} --token-code #{code}"
+    result = AwsMfa::ShellCommand.new(credentials_command).call
+    if result.succeeded?
+      result.output
+    else
+      raise Errors::InvalidCode, 'There was a problem validating the MFA code with AWS'
+    end
   end
 
   def write_credentials_to_file(credentials_file, credentials)

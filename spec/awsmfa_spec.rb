@@ -62,6 +62,16 @@ RSpec.describe 'AwsMfa' do
       }])
       expect(subject.load_arn).to eq 'foo'
     end
+
+    it 'raises an error when there is a problem with aws' do
+      command = double(call: double(succeeded?: false))
+      allow(AwsMfa::ShellCommand).to receive(:new).and_return(command)
+
+      expect { subject.load_arn }.to raise_error(
+        AwsMfa::Errors::Error,
+        'There was a problem fetching MFA devices from AWS'
+      )
+    end
   end
 
   describe '#load_arn_profile' do
@@ -109,6 +119,16 @@ RSpec.describe 'AwsMfa' do
     it 'loads credentials from aws when file does not exist' do
       allow(subject).to receive(:load_credentials_from_aws).and_return('{"Credentials":"foo"}')
       expect(subject.load_credentials('arn')).to eq 'foo'
+    end
+
+    it 'raises an error when aws returns an error' do
+      allow(subject).to receive(:request_code_from_user).and_return('867530')
+      command = double(call: double(succeeded?: false))
+      allow(AwsMfa::ShellCommand).to receive(:new).and_return(command)
+      expect { subject.load_credentials('arn') }.to raise_error(
+        AwsMfa::Errors::InvalidCode,
+        'There was a problem validating the MFA code with AWS'
+      )
     end
   end
 
