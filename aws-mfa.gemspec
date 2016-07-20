@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name         = 'aws-mfa'
-  s.version      = '0.3.0'
-  s.date         = '2016-02-09'
+  s.version      = '0.3.1'
+  s.date         = '2016-07-20'
   s.description  = 'Run AWS commands with MFA'
   s.summary      = s.description
   s.authors      = ['Brian Pitts']
