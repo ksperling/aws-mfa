@@ -1,12 +1,17 @@
 Gem::Specification.new do |s|
   s.name         = 'aws-mfa'
-  s.version      = '0.3.1'
+  s.version      = '0.3.2'
   s.date         = '2016-07-20'
   s.description  = 'Run AWS commands with MFA'
   s.summary      = s.description
   s.authors      = ['Brian Pitts']
   s.email        = 'brian.pitts@lonelyplanet.com'
-  s.files        = ['lib/aws_mfa.rb', 'lib/aws_mfa/errors.rb']
+  s.files        = [
+    'lib/aws_mfa.rb',
+    'lib/aws_mfa/errors.rb',
+    'lib/aws_mfa/shell_command.rb',
+    'lib/aws_mfa/shell_command_result.rb'
+  ]
   s.executables  = ['aws-mfa']
   s.homepage     = 'http://www.github.com/lonelyplanet/aws-mfa'
   s.license      = 'Apache-2.0'
