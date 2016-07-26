@@ -34,3 +34,22 @@ The first is to use it to alter the environment of your current shell. To do thi
 ### Wrapper
 
 The second is to use it to alter the environment of a single invocation of a program. `aws-mfa` tries to execute its arguments. `aws-mfa aws` would run the aws cli, `aws-mfa kitchen` would run test-kitchen, and so on. You can safely setup an alias with `alias aws=aws-mfa aws`. With the alias, if you had set up autcompletion for `aws` it will still work.
+
+## Standard Release Process
+
+Maintainers should use the standard process below when releasing a new version. The text can be copied into a GitHub issue or PR to serve as a checklist.
+
+```
+- [ ] update `aws-mfa.gemspec`
+  - [ ] update `s.version`
+  - [ ] update `s.date`
+  - [ ] add/remove any new/deleted items from `s.files`
+- [ ] build the gem locally: `rake gem build aws-mfa.gemspec`
+- [ ] install built gem locally: `gem install ./aws-mfa-x.x.x.gem`
+- [ ] test the gem locally
+  - [ ] test the first run experience: `rm -f ~/.aws/mfa_credentials ~/.aws/mfa_devices && aws-mfa`
+  - [ ] test any changes in this release
+- [ ] publish to rubygems: `gem push aws-mfa-x.x.x.gem`
+- [ ] install the gem from rubygems and test (see testing steps above)
+- [ ] create a release on GitHub https://github.com/lonelyplanet/aws-mfa/releases
+```
