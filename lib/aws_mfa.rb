@@ -66,22 +66,32 @@ class AwsMfa
 
   def load_arn_from_aws(profile='default')
     puts 'Fetching MFA devices for your account...'
-    if mfa_devices(profile).any?
-      mfa_devices(profile).first.fetch('SerialNumber')
+    devs = mfa_devices(profile)
+    if devs.any?
+      devs.first.fetch('SerialNumber')
     else
       raise Errors::DeviceNotFound, 'No MFA devices were found for your account'
     end
   end
 
+  def username(profile='default')
+    # User will need sts:GetCallerIdentity permission
+    get_identity_command = "aws --profile #{profile} --output json sts get-caller-identity"
+    result = AwsMfa::ShellCommand.new(get_identity_command).call
+    raise Errors::Error 'Unable to determine identity' unless result.succeeded?
+    user = JSON.parse(result.output)['Arn'][/^arn:aws:iam::\d+:user\/([\w+=,.@-]+)$/, 1]
+    raise Errors::Error 'Unable to derive username from identity ARN' unless user
+    user
+  end
+
   def mfa_devices(profile='default')
-    @mfa_devices ||= begin
-      list_mfa_devices_command = "aws --profile #{profile} --output json iam list-mfa-devices"
-      result = AwsMfa::ShellCommand.new(list_mfa_devices_command).call
-      if result.succeeded?
-        JSON.parse(result.output).fetch('MFADevices')
-      else
-        raise Errors::Error, 'There was a problem fetching MFA devices from AWS'
-      end
+    user = username(profile)
+    list_mfa_devices_command = "aws --profile #{profile} --output json iam list-mfa-devices --user-name #{user}"
+    result = AwsMfa::ShellCommand.new(list_mfa_devices_command).call
+    if result.succeeded?
+      JSON.parse(result.output).fetch('MFADevices')
+    else
+      raise Errors::Error, 'There was a problem fetching MFA devices from AWS'
     end
   end
 
