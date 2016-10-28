@@ -35,6 +35,29 @@ The first is to use it to alter the environment of your current shell. To do thi
 
 The second is to use it to alter the environment of a single invocation of a program. `aws-mfa` tries to execute its arguments. `aws-mfa aws` would run the aws cli, `aws-mfa kitchen` would run test-kitchen, and so on. You can safely setup an alias with `alias aws=aws-mfa aws`. With the alias, if you had set up autcompletion for `aws` it will still work.
 
+## IAM Policy
+
+The following IAM policy enables the permissions required for a user to use `aws-mfa`. If auto-discovery of the MFA device is not needed only `sts:GetSessionToken` is required.
+
+```
+{ "Version": "2012-10-17",
+  "Statement": [ {
+    "Action": "sts:GetCallerIdentity",
+    "Resource": "*",
+    "Effect": "Allow"
+  }, {
+    "Action": "iam:ListMfaDevices",
+    "Resource": "arn:aws:iam::*:user/${aws:username}",
+    "Effect": "Allow"
+  }, {
+    "Action": "sts:GetSessionToken",
+    "Resource": "*",
+    "Condition": { "Bool": { "aws:SecureTransport": "true" } },
+    "Effect": "Allow"
+  } ]
+}
+```
+
 ## Standard Release Process
 
 Maintainers should use the standard process below when releasing a new version. The text can be copied into a GitHub issue or PR to serve as a checklist.
