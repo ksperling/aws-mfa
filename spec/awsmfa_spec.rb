@@ -67,10 +67,7 @@ RSpec.describe 'AwsMfa' do
       command = double(call: double(succeeded?: false))
       allow(AwsMfa::ShellCommand).to receive(:new).and_return(command)
 
-      expect { subject.load_arn }.to raise_error(
-        AwsMfa::Errors::Error,
-        'There was a problem fetching MFA devices from AWS'
-      )
+      expect { subject.load_arn }.to raise_error(AwsMfa::Errors::Error)
     end
   end
 
@@ -125,10 +122,7 @@ RSpec.describe 'AwsMfa' do
       allow(subject).to receive(:request_code_from_user).and_return('867530')
       command = double(call: double(succeeded?: false))
       allow(AwsMfa::ShellCommand).to receive(:new).and_return(command)
-      expect { subject.load_credentials('arn') }.to raise_error(
-        AwsMfa::Errors::InvalidCode,
-        'There was a problem validating the MFA code with AWS'
-      )
+      expect { subject.load_credentials('arn') }.to raise_error(AwsMfa::Errors::InvalidCode)
     end
   end
 

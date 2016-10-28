@@ -78,9 +78,9 @@ class AwsMfa
     # User will need sts:GetCallerIdentity permission
     get_identity_command = "aws --profile #{profile} --output json sts get-caller-identity"
     result = AwsMfa::ShellCommand.new(get_identity_command).call
-    raise Errors::Error 'Unable to determine identity' unless result.succeeded?
+    raise Errors::Error, 'Unable to determine identity' unless result.succeeded?
     user = JSON.parse(result.output)['Arn'][/^arn:aws:iam::\d+:user\/([\w+=,.@-]+)$/, 1]
-    raise Errors::Error 'Unable to derive username from identity ARN' unless user
+    raise Errors::Error, 'Unable to derive username from identity ARN' unless user
     user
   end
 
