@@ -93,18 +93,18 @@ class AwsMfa
   end
 
   def write_arn_to_file(arn_file, arn)
-    File.open(arn_file, 'w', 0600) { |f| f.print arn }
+    File.open(arn_file, 'w', 0600) {|f| f.print arn }
     STDERR.puts "Using MFA device #{arn}. To change this in the future edit #{arn_file}."
   end
 
-  def load_credentials(arn, profile='default', persist=true)
+  def load_credentials(arn, profile='default', duration=0, persist=true)
     credentials_file_name = 'mfa_credentials'
     credentials_file_name = "#{profile}_#{credentials_file_name}" unless profile == 'default'
     credentials_file  = File.join(aws_config_dir, credentials_file_name)
 
     credentials = load_credentials_from_file(credentials_file)
     unless credentials_valid?(credentials)
-      credentials = load_credentials_from_aws(arn, profile)
+      credentials = load_credentials_from_aws(arn, profile, duration)
       write_credentials_to_file(credentials_file, credentials) if persist
     end
 
@@ -119,10 +119,11 @@ class AwsMfa
     end
   end
 
-  def load_credentials_from_aws(arn, profile='default')
+  def load_credentials_from_aws(arn, profile='default', duration=0)
     code = request_code_from_user
     unset_environment
     credentials_command = "aws --profile #{profile} --output json sts get-session-token --serial-number #{arn} --token-code #{code}"
+    credentials_command += " --duration-seconds #{duration}" if duration > 0
     result = AwsMfa::ShellCommand.new(credentials_command).call
     raise Errors::InvalidCode, 'There was a problem validating the MFA code with AWS' unless result.succeeded?
     JSON.parse(result.output)['Credentials']
@@ -130,7 +131,7 @@ class AwsMfa
 
   def write_credentials_to_file(credentials_file, credentials)
     # Wrap back into the top-level Credentials object for backwards compatibility
-    File.open(credentials_file, 'w', 0600) { |f| f.print(JSON.unparse({ 'Credentials' => credentials })) }
+    File.open(credentials_file, 'w', 0600) {|f| f.print(JSON.unparse({ 'Credentials' => credentials })) }
   end
 
   def request_code_from_user
@@ -193,12 +194,14 @@ class AwsMfa
 
   def execute
     profile = ENV['AWS_DEFAULT_PROFILE'] || 'default'
+    duration = (ENV['AWS_MFA_SESSION_DURATION'] || '0').to_i
     persist = (ENV['AWS_MFA_PERSIST'] || 'true') == 'true'
     begin
       OptionParser.new do |opts|
         opts.banner = "Usage: aws-mfa [options]"
         opts.on("--profile=PROFILE", "Use a specific profile from your credential file") {|p| profile = p }
-        opts.on("--[no-]persist", "Store temporary credentials in ~/.aws (default: enabled)") { |p| persist = p }
+        opts.on("--session-duration=SECONDS", Integer, "Session validity period to request from STS") {|s| duration = s }
+        opts.on("--[no-]persist", "Store temporary credentials in ~/.aws (default: enabled)") {|p| persist = p }
         opts.on("--help", "Prints this help") { puts opts; exit }
       end.parse!
     rescue OptionParser::ParseError => e
@@ -206,11 +209,12 @@ class AwsMfa
     end
 
     arn = load_arn(profile)
-    credentials = load_credentials(arn, profile, persist)
+    credentials = load_credentials(arn, profile, duration, persist)
 
     if ARGV.empty?
       print_environment(credentials, profile)
     else
+      ENV['AWS_MFA_SESSION_DURATION'] = duration.to_s
       ENV['AWS_MFA_PERSIST'] = persist.to_s
       export_environment(credentials, profile)
       exec(*(ARGV == [ 'shell' ] ? interactive_shell : ARGV))

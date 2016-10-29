@@ -123,7 +123,7 @@ RSpec.describe 'AwsMfa' do
 
     it 'loads does not persist credentials when persist=false' do
       allow(subject).to receive(:load_credentials_from_aws).and_return({})
-      subject.load_credentials('arn', 'prod', false)
+      subject.load_credentials('arn', 'prod', 0, false)
       expect(File).not_to exist(credentials_path)
     end
 
