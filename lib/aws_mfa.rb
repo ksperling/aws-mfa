@@ -96,7 +96,7 @@ class AwsMfa
   end
 
   def write_arn_to_file(arn_file, arn)
-    File.open(arn_file, 'w') { |f| f.print arn }
+    File.open(arn_file, 'w', 0600) { |f| f.print arn }
     STDERR.puts "Using MFA device #{arn}. To change this in the future edit #{arn_file}."
   end
 
@@ -134,7 +134,7 @@ class AwsMfa
   end
 
   def write_credentials_to_file(credentials_file, credentials)
-    File.open(credentials_file, 'w') { |f| f.print credentials }
+    File.open(credentials_file, 'w', 0600) { |f| f.print credentials }
   end
 
   def request_code_from_user
