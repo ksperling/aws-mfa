@@ -146,30 +146,54 @@ class AwsMfa
     credentials && Time.now.utc.iso8601 < credentials['Expiration']
   end
 
+  def generate_environment(credentials, profile)
+    yield 'AWS_SECRET_ACCESS_KEY', credentials['SecretAccessKey']
+    yield 'AWS_ACCESS_KEY_ID', credentials['AccessKeyId']
+    yield 'AWS_SESSION_TOKEN', credentials['SessionToken']
+    yield 'AWS_SECURITY_TOKEN', credentials['SessionToken']
+    yield 'AWS_SESSION_EXPIRATION', credentials['Expiration']
+    yield 'AWS_DEFAULT_PROFILE', profile
+  end
+
   def unset_environment
-    ENV.delete('AWS_SECRET_ACCESS_KEY')
-    ENV.delete('AWS_ACCESS_KEY_ID')
-    ENV.delete('AWS_SESSION_TOKEN')
-    ENV.delete('AWS_SECURITY_TOKEN')
+    generate_environment({}, nil) {|k,v| ENV.delete(k) }
   end
 
-  def print_credentials(credentials)
-    puts "export AWS_SECRET_ACCESS_KEY='#{credentials['SecretAccessKey']}'"
-    puts "export AWS_ACCESS_KEY_ID='#{credentials['AccessKeyId']}'"
-    puts "export AWS_SESSION_TOKEN='#{credentials['SessionToken']}'"
-    puts "export AWS_SECURITY_TOKEN='#{credentials['SessionToken']}'"
+  def print_environment(credentials, profile)
+    generate_environment(credentials, profile) {|k,v| puts "export #{k}='#{v}'" }
   end
 
-  def export_credentials(credentials)
-    ENV['AWS_SECRET_ACCESS_KEY'] = credentials['SecretAccessKey']
-    ENV['AWS_ACCESS_KEY_ID'] = credentials['AccessKeyId']
-    ENV['AWS_SESSION_TOKEN'] = credentials['SessionToken']
-    ENV['AWS_SECURITY_TOKEN'] = credentials['SessionToken']
+  def export_environment(credentials, profile)
+    generate_environment(credentials, profile) {|k,v| ENV[k] = v }
+  end
+
+  def interactive_shell
+    # Export path to aws-mfa so it can be invoked from the shell
+    ENV['AWS_MFA'] = File.expand_path('../bin/aws-mfa', File.dirname(__FILE__))
+
+    # Figure out the type of shell and enable shell-specific functionality if available
+    shell = ENV['SHELL'] || '/bin/sh'
+    name = File.basename(shell)
+
+    if name == 'bash' || name != 'sh' && %x(#{shell} --version 2>&1 </dev/null).start_with?('GNU bash')
+      # bash --rcfile lets us load our custom bashrc. Note this doesn't work when running bash as 'sh'
+      [ shell, '--rcfile', File.expand_path('bashrc', File.dirname(__FILE__)), '-i' ]
+
+    elsif name == 'zsh' || %x(#{shell} --version 2>&1 </dev/null).start_with?('zsh')
+      # zsh doesn't have anything like '--rcfile', so we have to hook the entire ZDOTDIR
+      ENV['AWS_MFA_ZDOTREAL'] = ENV['ZDOTDIR']
+      ENV['ZDOTDIR'] = File.expand_path(File.dirname(__FILE__))
+      [ shell, '-i' ]
+
+    else
+      STDERR.puts "Note: automatic token refresh is not supported in this shell (#{shell})"
+      [ shell, '-i' ]
+    end
   end
 
   def execute
-    profile = 'default'
-    persist = true
+    profile = ENV['AWS_DEFAULT_PROFILE'] || 'default'
+    persist = (ENV['AWS_MFA_PERSIST'] || 'true') == 'true'
     begin
       OptionParser.new do |opts|
         opts.banner = "Usage: aws-mfa [options]"
@@ -185,10 +209,11 @@ class AwsMfa
     credentials = load_credentials(arn, profile, persist)
 
     if ARGV.empty?
-      print_credentials(credentials)
+      print_environment(credentials, profile)
     else
-      export_credentials(credentials)
-      exec(*ARGV)
+      ENV['AWS_MFA_PERSIST'] = persist.to_s
+      export_environment(credentials, profile)
+      exec(*(ARGV == [ 'shell' ] ? interactive_shell : ARGV))
     end
   end
 end
