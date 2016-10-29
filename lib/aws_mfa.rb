@@ -65,7 +65,7 @@ class AwsMfa
   end
 
   def load_arn_from_aws(profile='default')
-    puts 'Fetching MFA devices for your account...'
+    STDERR.puts 'Fetching MFA devices for your account...'
     devs = mfa_devices(profile)
     if devs.any?
       devs.first.fetch('SerialNumber')
@@ -97,7 +97,7 @@ class AwsMfa
 
   def write_arn_to_file(arn_file, arn)
     File.open(arn_file, 'w') { |f| f.print arn }
-    puts "Using MFA device #{arn}. To change this in the future edit #{arn_file}."
+    STDERR.puts "Using MFA device #{arn}. To change this in the future edit #{arn_file}."
   end
 
   def load_credentials(arn, profile='default')
@@ -138,7 +138,7 @@ class AwsMfa
   end
 
   def request_code_from_user
-    puts 'Enter the 6-digit code from your MFA device:'
+    STDERR.puts 'Enter the 6-digit code from your MFA device:'
     code = $stdin.gets.chomp
     raise Errors::InvalidCode, 'That is an invalid MFA code' unless code =~ /^\d{6}$/
     code
