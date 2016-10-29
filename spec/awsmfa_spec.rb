@@ -121,6 +121,12 @@ RSpec.describe 'AwsMfa' do
       expect(subject.load_credentials('arn', 'prod')).to eq credentials
     end
 
+    it 'loads does not persist credentials when persist=false' do
+      allow(subject).to receive(:load_credentials_from_aws).and_return({})
+      subject.load_credentials('arn', 'prod', false)
+      expect(File).not_to exist(credentials_path)
+    end
+
     it 'raises an error when aws returns an error' do
       allow(subject).to receive(:request_code_from_user).and_return('867530')
       command = double(call: double(succeeded?: false))

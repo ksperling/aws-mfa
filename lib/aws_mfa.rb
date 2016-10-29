@@ -97,7 +97,7 @@ class AwsMfa
     STDERR.puts "Using MFA device #{arn}. To change this in the future edit #{arn_file}."
   end
 
-  def load_credentials(arn, profile='default')
+  def load_credentials(arn, profile='default', persist=true)
     credentials_file_name = 'mfa_credentials'
     credentials_file_name = "#{profile}_#{credentials_file_name}" unless profile == 'default'
     credentials_file  = File.join(aws_config_dir, credentials_file_name)
@@ -105,7 +105,7 @@ class AwsMfa
     credentials = load_credentials_from_file(credentials_file)
     unless credentials_valid?(credentials)
       credentials = load_credentials_from_aws(arn, profile)
-      write_credentials_to_file(credentials_file, credentials)
+      write_credentials_to_file(credentials_file, credentials) if persist
     end
 
     credentials
@@ -169,10 +169,12 @@ class AwsMfa
 
   def execute
     profile = 'default'
+    persist = true
     begin
       OptionParser.new do |opts|
         opts.banner = "Usage: aws-mfa [options]"
-        opts.on("--profile=PROFILE", "Use a specific profile from your credential file") {|p| profile=p }
+        opts.on("--profile=PROFILE", "Use a specific profile from your credential file") {|p| profile = p }
+        opts.on("--[no-]persist", "Store temporary credentials in ~/.aws (default: enabled)") { |p| persist = p }
         opts.on("--help", "Prints this help") { puts opts; exit }
       end.parse!
     rescue OptionParser::ParseError => e
@@ -180,7 +182,7 @@ class AwsMfa
     end
 
     arn = load_arn(profile)
-    credentials = load_credentials(arn, profile)
+    credentials = load_credentials(arn, profile, persist)
 
     if ARGV.empty?
       print_credentials(credentials)
