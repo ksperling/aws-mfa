@@ -1,5 +1,6 @@
 require 'json'
 require 'time'
+require 'optparse'
 require 'aws_mfa/errors'
 require 'aws_mfa/shell_command'
 require 'aws_mfa/shell_command_result'
@@ -167,13 +168,15 @@ class AwsMfa
 
   def execute
     profile = 'default'
-    profile_index = ARGV.index('--profile')
-    if (!profile_index.nil?)
-      profile = ARGV.delete_at(profile_index + 1)
-      ARGV.delete_at(profile_index)
-    end
+    OptionParser.new do |opts|
+      opts.banner = "Usage: aws-mfa [options]"
+      opts.on("--profile=PROFILE", "Use a specific profile from your credential file") {|p| profile=p }
+      opts.on("--help", "Prints this help") { puts opts; exit }
+    end.parse!
+
     arn = load_arn(profile)
     credentials = load_credentials(arn, profile)
+
     if ARGV.empty?
       print_credentials(credentials)
     else
