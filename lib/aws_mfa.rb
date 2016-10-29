@@ -134,7 +134,8 @@ class AwsMfa
   end
 
   def request_code_from_user
-    STDERR.puts 'Enter the 6-digit code from your MFA device:'
+    STDERR.print 'Enter the 6-digit code from your MFA device: '
+    STDERR.flush
     code = $stdin.gets.chomp
     raise Errors::InvalidCode, 'That is an invalid MFA code' unless code =~ /^\d{6}$/
     code
