@@ -168,11 +168,15 @@ class AwsMfa
 
   def execute
     profile = 'default'
-    OptionParser.new do |opts|
-      opts.banner = "Usage: aws-mfa [options]"
-      opts.on("--profile=PROFILE", "Use a specific profile from your credential file") {|p| profile=p }
-      opts.on("--help", "Prints this help") { puts opts; exit }
-    end.parse!
+    begin
+      OptionParser.new do |opts|
+        opts.banner = "Usage: aws-mfa [options]"
+        opts.on("--profile=PROFILE", "Use a specific profile from your credential file") {|p| profile=p }
+        opts.on("--help", "Prints this help") { puts opts; exit }
+      end.parse!
+    rescue OptionParser::ParseError => e
+      raise Errors::Error, e
+    end
 
     arn = load_arn(profile)
     credentials = load_credentials(arn, profile)
