@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'time'
 
 RSpec.describe 'AwsMfa' do
 
@@ -98,58 +99,33 @@ RSpec.describe 'AwsMfa' do
       create_aws_config
     end
 
-    let(:credentials_path) { '/home/.aws/mfa_credentials' }
+    let(:credentials_path) { '/home/.aws/prod_mfa_credentials' }
 
     it 'loads credentials from file when it is fresh' do
-      subject.write_arn_to_file(credentials_path, '{"Credentials":"bar"}')
-      expect(subject.load_credentials('arn')).to eq 'bar'
+      credentials = { 'Expiration' => (Time.now + 60).utc.iso8601 }
+      subject.write_credentials_to_file(credentials_path, credentials)
+      expect(subject.load_credentials('arn', 'prod')).to eq credentials
     end
 
-    it 'loads credentials from aws when file is too old' do
-      threshold = 60 * 60 * 12
-      subject.write_arn_to_file(credentials_path, '{"Credentials":"bar"}')
-      File.utime(Time.now, Time.now - threshold, credentials_path)
-      allow(subject).to receive(:load_credentials_from_aws).and_return('{"Credentials":"foo"}')
-      expect(subject.load_credentials('arn')).to eq 'foo'
+    it 'loads credentials from aws when stored credentials are expired' do
+      old_credentials = { 'Expiration' => (Time.now - 100).utc.iso8601 }
+      new_credentials = {}
+      subject.write_credentials_to_file(credentials_path, old_credentials)
+      allow(subject).to receive(:load_credentials_from_aws).and_return(new_credentials)
+      expect(subject.load_credentials('arn', 'prod')).to eq new_credentials
     end
 
     it 'loads credentials from aws when file does not exist' do
-      allow(subject).to receive(:load_credentials_from_aws).and_return('{"Credentials":"foo"}')
-      expect(subject.load_credentials('arn')).to eq 'foo'
+      credentials = { 'hello' => 'world' }
+      allow(subject).to receive(:load_credentials_from_aws).and_return(credentials)
+      expect(subject.load_credentials('arn', 'prod')).to eq credentials
     end
 
     it 'raises an error when aws returns an error' do
       allow(subject).to receive(:request_code_from_user).and_return('867530')
       command = double(call: double(succeeded?: false))
       allow(AwsMfa::ShellCommand).to receive(:new).and_return(command)
-      expect { subject.load_credentials('arn') }.to raise_error(AwsMfa::Errors::InvalidCode)
-    end
-  end
-
-  describe '#load_credentials_profile' do
-    before(:each) do
-      create_aws_binary
-      create_aws_config
-    end
-
-    let(:credentials_path) { '/home/.aws/prod_mfa_credentials' }
-
-    it 'loads credentials from file when it is fresh for profile' do
-      subject.write_arn_to_file(credentials_path, '{"Credentials":"bar"}')
-      expect(subject.load_credentials('arn', 'prod')).to eq 'bar'
-    end
-
-    it 'loads credentials from aws when file is too old for profile' do
-      threshold = 60 * 60 * 12
-      subject.write_arn_to_file(credentials_path, '{"Credentials":"bar"}')
-      File.utime(Time.now, Time.now - threshold, credentials_path)
-      allow(subject).to receive(:load_credentials_from_aws).and_return('{"Credentials":"foo"}')
-      expect(subject.load_credentials('arn', 'prod')).to eq 'foo'
-    end
-
-    it 'loads credentials from aws when file does not exist' do
-      allow(subject).to receive(:load_credentials_from_aws).and_return('{"Credentials":"foo"}')
-      expect(subject.load_credentials('arn', 'prod')).to eq 'foo'
+      expect { subject.load_credentials('arn', 'prod') }.to raise_error(AwsMfa::Errors::InvalidCode)
     end
   end
 

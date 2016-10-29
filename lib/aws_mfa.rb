@@ -1,4 +1,5 @@
 require 'json'
+require 'time'
 require 'aws_mfa/errors'
 require 'aws_mfa/shell_command'
 require 'aws_mfa/shell_command_result'
@@ -45,14 +46,11 @@ class AwsMfa
 
   def load_arn(profile='default')
     arn_file_name = 'mfa_device'
-    if (! profile.eql? 'default')
-      arn_file_name = "#{profile}_#{arn_file_name}"
-    end
+    arn_file_name = "#{profile}_#{arn_file_name}" unless profile == 'default'
     arn_file = File.join(aws_config_dir, arn_file_name)
 
-    if File.readable?(arn_file)
-      arn = load_arn_from_file(arn_file)
-    else
+    arn = load_arn_from_file(arn_file)
+    unless arn
       arn = load_arn_from_aws(profile)
       write_arn_to_file(arn_file, arn)
     end
@@ -61,17 +59,18 @@ class AwsMfa
   end
 
   def load_arn_from_file(arn_file)
-    File.read(arn_file)
+    begin
+      File.read(arn_file)
+    rescue Errno::ENOENT
+      nil
+    end
   end
 
   def load_arn_from_aws(profile='default')
     STDERR.puts 'Fetching MFA devices for your account...'
     devs = mfa_devices(profile)
-    if devs.any?
-      devs.first.fetch('SerialNumber')
-    else
-      raise Errors::DeviceNotFound, 'No MFA devices were found for your account'
-    end
+    raise Errors::DeviceNotFound, 'No MFA devices were found for your account' unless devs.any?
+    devs.first['SerialNumber']
   end
 
   def username(profile='default')
@@ -88,11 +87,8 @@ class AwsMfa
     user = username(profile)
     list_mfa_devices_command = "aws --profile #{profile} --output json iam list-mfa-devices --user-name #{user}"
     result = AwsMfa::ShellCommand.new(list_mfa_devices_command).call
-    if result.succeeded?
-      JSON.parse(result.output).fetch('MFADevices')
-    else
-      raise Errors::Error, 'There was a problem fetching MFA devices from AWS'
-    end
+    raise Errors::Error, 'There was a problem fetching MFA devices from AWS' unless result.succeeded?
+    JSON.parse(result.output)['MFADevices']
   end
 
   def write_arn_to_file(arn_file, arn)
@@ -102,23 +98,24 @@ class AwsMfa
 
   def load_credentials(arn, profile='default')
     credentials_file_name = 'mfa_credentials'
-    if (! profile.eql? 'default')
-      credentials_file_name = "#{profile}_#{credentials_file_name}"
-    end
+    credentials_file_name = "#{profile}_#{credentials_file_name}" unless profile == 'default'
     credentials_file  = File.join(aws_config_dir, credentials_file_name)
 
-    if File.readable?(credentials_file) && token_not_expired?(credentials_file)
-      credentials = load_credentials_from_file(credentials_file)
-    else
+    credentials = load_credentials_from_file(credentials_file)
+    unless credentials_valid?(credentials)
       credentials = load_credentials_from_aws(arn, profile)
       write_credentials_to_file(credentials_file, credentials)
     end
 
-    JSON.parse(credentials).fetch('Credentials')
+    credentials
   end
 
   def load_credentials_from_file(credentials_file)
-    File.read(credentials_file)
+    begin
+      JSON.parse(File.read(credentials_file))['Credentials']
+    rescue Errno::ENOENT
+      nil
+    end
   end
 
   def load_credentials_from_aws(arn, profile='default')
@@ -126,15 +123,13 @@ class AwsMfa
     unset_environment
     credentials_command = "aws --profile #{profile} --output json sts get-session-token --serial-number #{arn} --token-code #{code}"
     result = AwsMfa::ShellCommand.new(credentials_command).call
-    if result.succeeded?
-      result.output
-    else
-      raise Errors::InvalidCode, 'There was a problem validating the MFA code with AWS'
-    end
+    raise Errors::InvalidCode, 'There was a problem validating the MFA code with AWS' unless result.succeeded?
+    JSON.parse(result.output)['Credentials']
   end
 
   def write_credentials_to_file(credentials_file, credentials)
-    File.open(credentials_file, 'w', 0600) { |f| f.print credentials }
+    # Wrap back into the top-level Credentials object for backwards compatibility
+    File.open(credentials_file, 'w', 0600) { |f| f.print(JSON.unparse({ 'Credentials' => credentials })) }
   end
 
   def request_code_from_user
@@ -144,23 +139,16 @@ class AwsMfa
     code
   end
 
+  def credentials_valid?(credentials)
+    # Simple lexical comparison works due to the fixed ISO 8601 format
+    credentials && Time.now.utc.iso8601 < credentials['Expiration']
+  end
+
   def unset_environment
     ENV.delete('AWS_SECRET_ACCESS_KEY')
     ENV.delete('AWS_ACCESS_KEY_ID')
     ENV.delete('AWS_SESSION_TOKEN')
     ENV.delete('AWS_SECURITY_TOKEN')
-  end
-
-  def token_not_expired?(credentials_file)
-    # default is 12 hours
-    expiration_period = 12 * 60 * 60
-    mtime = File.stat(credentials_file).mtime
-    now = Time.new
-    if now - mtime < expiration_period
-      true
-    else
-      false
-    end
   end
 
   def print_credentials(credentials)
