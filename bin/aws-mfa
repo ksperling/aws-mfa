@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-$LOAD_PATH.unshift File.expand_path(File.join(File.dirname(__FILE__), '../lib'))
+$LOAD_PATH.unshift File.expand_path('../lib', File.dirname(__FILE__))
 
 require 'aws_mfa'
 
@@ -9,4 +9,6 @@ begin
   aws_mfa.execute
 rescue AwsMfa::Errors::Error => e
   abort e.message
+rescue Interrupt
+  exit 128+Signal.list['INT']
 end
