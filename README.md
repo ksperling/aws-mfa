@@ -23,17 +23,26 @@ Before using `aws-mfa`, you must have the [AWS CLI](https://aws.amazon.com/cli/)
 
 The very first time you run `aws-mfa` it will fetch the ARN for your MFA device and ask you to confirm it. Next, it will prompt you for the 6-digit code from your MFA device. For the next 12 hours, `aws-mfa` will not prompt you for anything. After 12 hours, your temporary credentials expire, so `aws-mfa` will prompt you for the 6-digit code again.
 
-By default `aws-mfa` will use the default profile from aws cli, to specify a different profile to use simply use the `--profile` parameter like you normally would with the aws cli
+By default `aws-mfa` will use the default profile from aws cli; to specify a different profile to use simply use the `--profile` parameter or the `AWS_DEFAULT_PROFILE` environment variable like you normally would with the aws cli.
 
-There are two ways you can use `aws-mfa`:
+By default your temporary credentials will be stored in `~/.aws/mfa_credentials`; if you do not want the credentials to be written to disk, use the `--no-persist` option, or set `AWS_MFA_PERSIST=false`. This option is particularly useful in combination with `shell` mode (see below).
+
+The default session validity of 12 hours can be changed with the `--session-duration` option, e.g. `--session-duration=900` would cause the temporary credentials to expire after 15 minutes (the minimum value accepted by AWS). This value can also be set using the `AWS_MFA_SESSION_DURATION` environment variable.
+
+There are three ways you can use `aws-mfa`:
 
 ### Eval
 
-The first is to use it to alter the environment of your current shell. To do this, run `eval $(aws-mfa)`. Now any command that uses the standard AWS environment variables should work.
+The first is to use it to alter the environment of your current shell. To do this, run `eval $(aws-mfa)`. Now any command that uses the standard AWS environment variables should work. Note that if you specified a `--profile` on the command line, the `AWS_DEFAULT_PROFILE` environmenet variable will be set to that profile.
 
 ### Wrapper
 
 The second is to use it to alter the environment of a single invocation of a program. `aws-mfa` tries to execute its arguments. `aws-mfa aws` would run the aws cli, `aws-mfa kitchen` would run test-kitchen, and so on. You can safely setup an alias with `alias aws=aws-mfa aws`. With the alias, if you had set up autcompletion for `aws` it will still work.
+
+### Shell
+
+The final option is to run `aws-mfa shell`. This will run a new instance of your shell with temporary credentials set up in the environment. If you shell is `bash` or `zsh` it will be configured such that the `aws` command will first check if your session is still valid and otherwise prompt for your MFA code again. This mode is particularly useful in combination with the `--no-persist` option of `aws-mfa` as it allows the session to be used interactively for multiple commands without saving the session credentials to disk. To discard the temporary credentials simply exit the sub-shell.
+
 
 ## IAM Policy
 
